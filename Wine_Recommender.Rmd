@@ -1,0 +1,155 @@
+---
+title: "Wine Recommender"
+author: "Sean Baron"
+date: "4/11/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Overview
+
+Wine Reviews is a dataset that contains information about nearly 13,000 different wines, including name and variety, where it was grown (country, province, winery, region), tasting information (description, taster, and taster's twitter handle). 
+
+This dataset was taken from Kaggle.com. You can read more about the dataset [here](https://www.kaggle.com/zynicide/wine-reviews). 
+
+## Inspiration
+
+I want to create a wine recommender that functions in 2 different ways for the end user, using either a Name Rating or Wine Attribute Approach.
+
+### Name-Rating Approach
+
+The user to rates their favorite wines and based on their ratings get a wine recommendation. This may cater to someone who's less familiar with the nuances and descriptions of wine and knows a few wines they like yet wants to get a reliable recommendation. 
+
+In this scenario, the user is asked to input the names of their favorite wines. (Challenge here will be name matching. May have to ask a clarification question. For example, if they refer to "Nicosia 2013 Vulkà Bianco  (Etna)" as a "Vulka Biano" then they'd be prompted with Choose from the following: "[1] Nicosia 2013 Vulkà Bianco  (Etna), [2] ... [3] None of these"). 
+
+Returned is a list of wines (and maybe a link to where they can buy it?). 
+
+### Wine Attribute Approach
+
+In this approach the user is given a number of questions about different aspects of wine (and rate them?). They can choose which questions to answer and that should aid the algorithm in making a recommendation based on favorite wine attributes. For example, the following questions are displayed:
+
+1) What countries do you most enjoy wine from? [Display list of countries to choose from]
+2) What regions make your favorite wine? [Display list of countries to choose from]
+3) What descriptors most describe your favorite wines? [Display descriptors to choose from]
+(...Upon further analysis more questions may emerge...)
+
+In answering the questions this approach could ask the user to rate each aspect they choose. For instance, pick your top 3 countries, most favorite 1st, second favorite 2nd, third favorite 3rd. This can be applied to any attribute.
+
+### Name-Rating Approach: Remaining Questions/Thoughts
+
+#### Collaborative Filtering
+
+Can I user collaborative filtering for this? Something like each column is a wine and each row is a word and the values are word frequencies. From that build a similarity matrix. If that works then I'd be able to return a list of x number of wines most like any given wine. In this scenario the user would only have to pick 1 wine, however choosing 3 could be even better. What's the algorithm for combining those three similarity vectors? 1 Approach (maybe?): make a grand similarity list and order it from least to greatest. For any wines that show up in the 3 lists more than one time multiply their similarity scores together.
+
+
+#### Taking into account rating
+
+Users should also be asked to rate their favorite wine on a scale of (1st. 2nd, and 3rd would do). The similarity vector for each of the three wines chosen by the user would be multiplied its rating before combining it with the other vectors for the grand similarity list for that attribute. This way each individual vector is scaled by how much the user enjoys it.
+
+#### Taking into account rating 'points'
+
+'points' are the rating of the wine by a professional taster. I assume the user would want that included, so same as with the user rating the similarity vector can also be multipled by the points (min = 80, max = 100, no NAs :) ).
+
+### Name-Rating Approach: Wine Attribute Approach
+
+For users to be able to choose which questions they want to answer, the matrix may differ. 
+
+In the case of choosing which descriptors they like most, we'd star twith a matrix that's reversed from the Name Approach: columns of descriptors and rows of wine names, values are 1 or 0 for each of the wines where the descriptor is present in the description. This would allows us to make a similarity matrix for descriptors, taking a similar approach to incorporate the ratings as above to build a grand similarity matrix. 
+
+The same approach can be taken with Country, Province, and Region: attribute in the columns, words in the rows, create a similarity matrix, incorporate ratings, build a grand similarity list for each attribute. 
+
+For any number of attributes I pick, say descriptors, Country, and Region, we can filter all the wines for the best recommendations by building a Best Recommendation List. The Best Recommendation List uses the rating-weighted similarities vector for each attribute (described above) to build a list of ranked permutations from the attributes' similarity vector (each next best option suggested would be each lower value permutation of each vector combination)
+
+Example: 
+
+descriptors_similarity <- c(sweet, bright, bold)
+Country_similarity <- c(France, Italy, California)
+Region_similarity <- c(Etna, Lake Michigan Shore, Willamette Valley)
+
+best_otions <- list(1st = c(sweet, France, Etna), 2nd_a = c(bright, Frane, Etna), 
+                    2nd_b = c(sweet, Italy, Etna), 2nd_b = c(sweet, France, Lake Michigan Shore), 
+                    3rd_a = ...)
+
+Notice: there's a 3-way tie for 2nd best recommendation because we don't have a grand rating across chosen attributes. If we wanted to account for this then we'd have to rate them and then the 2nd best recomendations can be broken into 2nd, 3rd, and 4th, and so on for all the other best recomendations. 
+
+### Method Notes
+
+#### Packages
+
+[Tidy Text Mining](www.tidytextmining.com) is an established package for text mining. I plan to use this unless there other better ones?
+
+### Working Notes
+
+#### Data Preparation
+##### Missing Values
+ 
+* country has 63 values missing ("")
+* province has 63 values missing ("")
+* price has 8996 missing values (NA)
+* region_1 has 21247 missing values ("")
+* region_2 has 79460 missing values ("")
+* taster_name has 26244 missing values ("")
+* taster_twitter_handle has 31213 missing values ("")
+* variety has 1 missing value ("")
+
+##### Attempt to build a matrix of relevant, distinct words in the wine descriptions as rows and titles of all the wines as columns. **Problem: to big of a matrix and R crashes.**
+
+```{r eval = FALSE}
+# Load libraries
+library("dplyr")
+library("data.table")
+library("tidytext")
+
+# Load and initial cleaing data
+wine.reviews <- fread("winemag-data-130k-v2.csv")
+colnames(wine.reviews)[1] <- "id" # rename first column
+wine.reviews[,1] <- wine.reviews[,1] + 1 # reindex to make first id = rownumber = 1
+
+
+# 'Tokenizing' words with tidytext
+descriptions <- wine.reviews %>% select(id, description)
+tidy_descriptors <- descriptions %>% unnest_tokens(word, description) # word is name of output column for each word, description is the input text to be tokenized
+tidy_descriptors <- tidy_descriptors %>% anti_join(stop_words) # remove stop_words (like to, the, at, etc)
+
+#Filter distinct words
+tidy_descriptors_distinct <- tidy_descriptors %>% distinct(word)
+
+# Create word_title_matrix ... CRASHING at 4e10^9 value matrix.    
+word_title_mat <- matrix(0, nrow = nrow(tidy_descriptors_distinct), ncol = length(wine.reviews$title))
+rownames(word_title_mat) <- rownames(tidy_descriptors_distinct$word)
+
+```
+
+#### 'How to do something in R' questions:
+
+1) Instead of checking for empty values manually, what's better way? Summarise_each is deprecated and summarise_at was giving me errors. Here's how I did it manually:
+
+* wine.reviews %>% summarise(sum(is.na(country)))
+* wine.reviews %>% summarise(sum(country == ""))
+* wine.reviews %>% summarise(sum(description == ""))
+* wine.reviews %>% summarise(sum(is.na(description)))  
+  
+I also tried:
+  
+* sapply(as.factor(colnames(wine.reviews)), sum(is.na(wine.reviews[,x])))
+* sapply(as.factor(colnames(wine.reviews)), sum(is.na(wine.reviews[,x])))
+* wine.reviews %>% summarise_all(is.na(.), c(id:winery))
+
+              
+
+
+
+
+
+
+
+
+
+
+
+
+
+
