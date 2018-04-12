@@ -65,9 +65,9 @@ For any number of attributes I pick, say descriptors, Country, and Region, we ca
 
 Example: 
 
-descriptors_similarity <- c(sweet, bright, bold)
-Country_similarity <- c(France, Italy, California)
-Region_similarity <- c(Etna, Lake Michigan Shore, Willamette Valley)
+descriptors_similarity <- c(sweet, bright, bold)  
+Country_similarity <- c(France, Italy, California)  
+Region_similarity <- c(Etna, Lake Michigan Shore, Willamette Valley)  
 
 best_otions <- list(1st = c(sweet, France, Etna), 2nd_a = c(bright, Frane, Etna), 
                     2nd_b = c(sweet, Italy, Etna), 2nd_b = c(sweet, France, Lake Michigan Shore), 
@@ -137,14 +137,6 @@ I also tried:
 * sapply(as.factor(colnames(wine.reviews)), sum(is.na(wine.reviews[,x])))
 * sapply(as.factor(colnames(wine.reviews)), sum(is.na(wine.reviews[,x])))
 * wine.reviews %>% summarise_all(is.na(.), c(id:winery))
-
-              
-
-
-
-
-
-
 
 
 
