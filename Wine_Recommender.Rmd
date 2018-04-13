@@ -123,6 +123,36 @@ rownames(word_title_mat) <- rownames(tidy_descriptors_distinct$word)
 
 ```
 
+#### Comparing description by country
+```{r}
+# Example input countries vector for function below: top 10 countries by number of wine reviews in dataset
+top_10_countries <- wine.reviews %>% count(country, sort = TRUE) %>% select(country) %>% head(n=10)
+
+# returns top top_n wines for vector of countries
+CountryTopWords <- function(countries, top_n){ 
+  df <- data_frame()
+  for (c in countries){
+    descriptions <- wine.reviews %>% filter(country == c) %>% select(id, country, description)
+    tidy_descriptors <- descriptions %>% unnest_tokens(word, description)
+    tidy_descriptors <- tidy_descriptors %>% anti_join(stop_words)
+    tidy_descriptors_top_n <- tidy_descriptors %>% 
+      group_by(country, word) %>% count(word, sort = TRUE) %>% head(n=top_n)
+    df <- bind_rows(df, tidy_descriptors_top_n)
+}
+    return(df)
+}
+
+# Visualizaton: dotplot 
+ggplot(tenCountries, aes(country, word, size = n, col = word)) +
++ geom_point()
+
+# Next steps with visualization
+# -Show entire list of words (only showing 35 now)
+# -How can ordering be changed so that patterns can be more easily seen from visualization
+```
+
+
+
 #### 'How to do something in R' questions:
 
 1) Instead of checking for empty values manually, what's better way? Summarise_each is deprecated and summarise_at was giving me errors. Here's how I did it manually:
